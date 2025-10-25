@@ -2,12 +2,17 @@
   "exePath": "C:\\Program Files\\Telemetry Overlay\\Telemetry Overlay.exe",
   "inputFolder": "E:\\MALL_1-10-2025 output1",
   "outputFolder": "E:\\MALL_1-10-2025 output1\\output",
-  "ProcessedFolder": "E:\\MALL_1-10-2025 output1\\processed",
+  "processedFolder": "E:\\MALL_1-10-2025 output1\\processed",
   "patternFile": "E:\\pattern.toptrn",
   "logFile": "logs/automation.log",
   "delays": {
-    "appLoad": 5000,
-    "stepDelay": 2000
+    "appLoad": 8000,
+    "fileDialogOpen": 3000,
+    "stepDelay": 2000,
+    "encodingTimePerMB": 500,
+    "minEncodingTime": 5000,
+    "maxEncodingTime": 120000,
+    "encodingCheckInterval": 2000
   },
   "_IMPORTANT_NOTE": "MAXIMIZE Telemetry Overlay (full screen) before running automation - same as during coordinate tracking!"
 }

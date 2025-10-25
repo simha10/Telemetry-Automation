@@ -1,8 +1,62 @@
 const { mouse, keyboard, Point, Button } = require("@nut-tree-fork/nut-js");
+const { mouse, keyboard, Point, Button } = require("@nut-tree-fork/nut-js");
 const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const { logMessage } = require("./logger");
+const { log: logMessage } = require("./logger");
+
+/**
+ * Calculates estimated encoding time based on video file size
+ * @param {string} videoPath - Path to the video file
+ * @param {object} settings - Settings object with encoding time parameters
+ * @returns {number} Estimated time in milliseconds
+ */
+function calculateEncodingTime(videoPath, settings) {
+  try {
+    const stats = fs.statSync(videoPath);
+    const fileSizeInMB = stats.size / (1024 * 1024);
+    
+    // Get configurable parameters or use defaults
+    const timePerMB = settings.delays.encodingTimePerMB || 500;
+    const minTime = settings.delays.minEncodingTime || 5000;
+    const maxTime = settings.delays.maxEncodingTime || 120000;
+    
+    // Calculate: timePerMB * file size, clamped between min and max
+    const estimatedTime = Math.min(Math.max(fileSizeInMB * timePerMB, minTime), maxTime);
+    
+    console.log(`   📊 Video size: ${fileSizeInMB.toFixed(2)} MB`);
+    console.log(`   ⏱️  Estimated encoding time: ${(estimatedTime / 1000).toFixed(1)}s`);
+    
+    return estimatedTime;
+  } catch (err) {
+    console.log(`   ⚠️  Could not determine file size, using default wait time`);
+    return settings.delays.minEncodingTime || 10000;
+  }
+}
+
+/**
+ * Waits for encoding to complete with progress updates
+ * @param {number} estimatedTime - Estimated time in milliseconds
+ * @param {number} checkInterval - How often to check (default 2000ms)
+ */
+async function waitForEncoding(estimatedTime, checkInterval = 2000) {
+  const startTime = Date.now();
+  let elapsed = 0;
+  
+  console.log(`\n⏳ Waiting for video encoding/optimization...`);
+  
+  while (elapsed < estimatedTime) {
+    await new Promise(r => setTimeout(r, checkInterval));
+    elapsed = Date.now() - startTime;
+    
+    const progress = Math.min((elapsed / estimatedTime) * 100, 100);
+    const remainingTime = Math.max(0, (estimatedTime - elapsed) / 1000);
+    
+    process.stdout.write(`\r   Progress: ${progress.toFixed(0)}% | Remaining: ~${remainingTime.toFixed(0)}s   `);
+  }
+  
+  console.log(`\n   ✅ Encoding should be complete!\n`);
+}
 
 // Configure mouse for better reliability
 mouse.config.mouseSpeed = 500; // Slower mouse movement for visibility
@@ -44,8 +98,10 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     await mouse.leftClick(); // Double-click for safety
     console.log('   ✅ Clicked Load Video button (double-clicked)');
     
-    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
-    console.log('   ⏳ Waiting for file dialog to open...');
+    // Wait for file dialog to open (configurable delay)
+    const fileDialogDelay = settings.delays.fileDialogOpen || 3000;
+    console.log(`   ⏳ Waiting ${fileDialogDelay}ms for file dialog to open...`);
+    await new Promise(r => setTimeout(r, fileDialogDelay));
 
     // Step 3: Type FULL video path (absolute path) and click Open
     console.log('\n📝 Step 3: Entering video path...');
@@ -69,7 +125,17 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     await mouse.leftClick();
     console.log('   ✅ Clicked Open button');
     
-    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
+    // Step 3.5: Wait for video encoding/optimization based on file size
+    console.log('\n🔄 Step 3.5: Waiting for video encoding...');
+    logMessage(settings.logFile, `Waiting for video encoding/optimization...`);
+    
+    const encodingTime = calculateEncodingTime(videoPath, settings);
+    const checkInterval = settings.delays.encodingCheckInterval || 2000;
+    await waitForEncoding(encodingTime, checkInterval);
+    
+    // Add a small buffer after encoding
+    console.log('   ⏳ Adding 2s buffer for UI to stabilize...');
+    await new Promise(r => setTimeout(r, 2000));
 
     // Step 4: Click Pattern Button
     logMessage(settings.logFile, `Step 4: Loading pattern from ${patternPath}...`);

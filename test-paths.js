@@ -31,7 +31,7 @@ if (fs.existsSync(settings.inputFolder)) {
   
   // Check for videos
   const videos = fs.readdirSync(settings.inputFolder)
-    .filter(f => f.endsWith('.mp4'));
+    .filter(f => f.toLowerCase().endsWith('.mp4'));
   
   if (videos.length > 0) {
     console.log(`   ✅ Found ${videos.length} video(s):`);

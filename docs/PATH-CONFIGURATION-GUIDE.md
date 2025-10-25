@@ -1,4 +1,4 @@
-00# 📁 Path Configuration Guide - No Manual Browsing!
+# 📁 Path Configuration Guide - No Manual Browsing!
 
 ## ✅ **Problem Solved!**
 
