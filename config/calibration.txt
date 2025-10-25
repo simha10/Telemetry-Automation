@@ -1,0 +1,5 @@
+Screen Resolution: 1920x1080
+Telemetry Version: v1.2.3
+Window Mode: Maximized
+Load Video: X=300, Y=150
+...

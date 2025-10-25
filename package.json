@@ -1,0 +1,25 @@
+{
+  "name": "telemetry-automation",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "jest",
+    "verify": "node verify-setup.js",
+    "tracker": "node scripts/tracker.js",
+    "test-coords": "node scripts/testHighlight.js",
+    "setup-tracking": "node scripts/setup-tracking.js",
+    "test-paths": "node test-paths.js",
+    "debug": "node debug-automation.js",
+    "test-click": "node test-mouse-click.js"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "fs-extra": "^11.1.1",
+    "winston": "^3.11.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}
