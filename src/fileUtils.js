@@ -7,17 +7,4 @@ function getAllVideos(inputFolder) {
     .map(file => path.join(inputFolder, file));
 }
 
-function moveToProcessed(sourceFolder, targetFolder, fileName) {
-  const sourcePath = path.join(sourceFolder, fileName);
-  const targetPath = path.join(targetFolder, fileName);
-  
-  // Ensure target folder exists
-  if (!fs.existsSync(targetFolder)) {
-    fs.mkdirSync(targetFolder, { recursive: true });
-  }
-  
-  // Move the file
-  fs.renameSync(sourcePath, targetPath);
-}
-
-module.exports = { getAllVideos, moveToProcessed };
+module.exports = { getAllVideos };

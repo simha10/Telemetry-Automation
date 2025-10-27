@@ -62,9 +62,10 @@ mouse.config.mouseSpeed = 500; // Slower mouse movement for visibility
 mouse.config.autoDelayMs = 100; // Small delay between actions
 
 async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
-  const videoName = path.basename(videoPath, ".mp4");
-  const projectPath = path.join(settings.outputFolder, `${videoName}_output.toproj`);
-  const outputVideo = path.join(settings.outputFolder, `${videoName}_output.mp4`);
+  // Remove file extension (case-insensitive for .mp4 or .MP4)
+  const videoName = path.basename(videoPath).replace(/\.mp4$/i, '');
+  const projectPath = path.join(settings.outputFolder, `${videoName}.toproj`);
+  const outputVideo = path.join(settings.outputFolder, `${videoName}.mp4`);
 
   try {
     logMessage(settings.logFile, `Starting automation for ${videoName}`);
@@ -137,62 +138,123 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     await new Promise(r => setTimeout(r, 2000));
 
     // Step 4: Click Pattern Button
-    logMessage(settings.logFile, `Step 4: Loading pattern from ${patternPath}...`);
-    await mouse.move(new Point(guiMap["Pattern Button"].x, guiMap["Pattern Button"].y));
-    await mouse.leftClick();
-    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
-
-    // Step 5: Click Load Pattern Button
-    await mouse.move(new Point(guiMap["Load Pattern Button"].x, guiMap["Load Pattern Button"].y));
-    await mouse.leftClick();
-    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
-
-    // Step 6: Type full pattern path
-    // Clear existing text
-    await keyboard.pressKey("Control", "A");
-    await new Promise(r => setTimeout(r, 100));
-    await keyboard.releaseKey("Control", "A");
-    await new Promise(r => setTimeout(r, 100));
+    console.log('\n🎨 Step 4: Clicking Pattern button...');
+    console.log(`   Target coordinates: (${guiMap["Pattern Button"].x}, ${guiMap["Pattern Button"].y})`);
+    logMessage(settings.logFile, `Step 4: Loading recently used pattern...`);
     
-    // Type pattern path
-    await keyboard.type(patternPath);
+    await mouse.move(new Point(guiMap["Pattern Button"].x, guiMap["Pattern Button"].y));
+    console.log('   ✅ Mouse moved to Pattern button');
     await new Promise(r => setTimeout(r, 500));
+    
+    await mouse.leftClick();
+    console.log('   ✅ Clicked Pattern button');
+    
+    // Wait for pattern menu/dialog to open
+    console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for pattern menu...`);
+    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 7: Click Load button in modal
+    // Step 5: Click Recently Used Pattern Button
+    console.log('\n📂 Step 5: Clicking Recently Used Pattern button...');
+    console.log(`   Target coordinates: (${guiMap["Recently used pattern button"].x}, ${guiMap["Recently used pattern button"].y})`);
+    
+    await mouse.move(new Point(guiMap["Recently used pattern button"].x, guiMap["Recently used pattern button"].y));
+    console.log('   ✅ Mouse moved to Recently Used Pattern button');
+    await new Promise(r => setTimeout(r, 500));
+    
+    await mouse.leftClick();
+    console.log('   ✅ Clicked Recently Used Pattern button');
+    
+    // Wait for modal to open
+    console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for modal to open...`);
+    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
+
+    // Step 6: Click Load button in modal
+    console.log('\n✔️ Step 6: Clicking Load button in modal...');
+    console.log(`   Target coordinates: (${guiMap["Load button in Modal"].x}, ${guiMap["Load button in Modal"].y})`);
+    
     await mouse.move(new Point(guiMap["Load button in Modal"].x, guiMap["Load button in Modal"].y));
+    console.log('   ✅ Mouse moved to Load button');
+    await new Promise(r => setTimeout(r, 500));
+    
     await mouse.leftClick();
+    console.log('   ✅ Clicked Load button');
+    console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for pattern to load...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 8: Click Export Button
-    logMessage(settings.logFile, `Step 8: Configuring export settings...`);
+    // Step 7: Click Export Button
+    console.log('\n📤 Step 7: Clicking Export button...');
+    console.log(`   Target coordinates: (${guiMap["Export Button"].x}, ${guiMap["Export Button"].y})`);
+    logMessage(settings.logFile, `Step 7: Configuring export settings...`);
+    
     await mouse.move(new Point(guiMap["Export Button"].x, guiMap["Export Button"].y));
+    console.log('   ✅ Mouse moved to Export button');
+    await new Promise(r => setTimeout(r, 500));
+    
     await mouse.leftClick();
+    console.log('   ✅ Clicked Export button');
+    console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for export panel...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 9: Set video quality to 0
+    // Step 8: Set video quality to 0
+    console.log('\n🎬 Step 8: Setting video quality to 0...');
+    console.log(`   Target coordinates: (${guiMap["set video quality to 0 button"].x}, ${guiMap["set video quality to 0 button"].y})`);
+    
     await mouse.move(new Point(guiMap["set video quality to 0 button"].x, guiMap["set video quality to 0 button"].y));
+    console.log('   ✅ Mouse moved to quality field');
+    await new Promise(r => setTimeout(r, 300));
+    
     await mouse.leftClick();
     await keyboard.type("0");
+    console.log('   ✅ Set video quality to 0');
     await new Promise(r => setTimeout(r, 300));
 
-    // Step 10: Set render speed to 0
+    // Step 9: Set render speed to 0
+    console.log('\n⚡ Step 9: Setting render speed to 0...');
+    console.log(`   Target coordinates: (${guiMap["set render speed to zero button"].x}, ${guiMap["set render speed to zero button"].y})`);
+    
     await mouse.move(new Point(guiMap["set render speed to zero button"].x, guiMap["set render speed to zero button"].y));
+    console.log('   ✅ Mouse moved to render speed field');
+    await new Promise(r => setTimeout(r, 300));
+    
     await mouse.leftClick();
     await keyboard.type("0");
+    console.log('   ✅ Set render speed to 0');
     await new Promise(r => setTimeout(r, 300));
 
-    // Step 11: Turn off "include original audio"
+    // Step 10: Turn off "include original audio"
+    console.log('\n🔇 Step 10: Turning off "include original audio"...');
+    console.log(`   Target coordinates: (${guiMap["turn off include \"include original audio\" button"].x}, ${guiMap["turn off include \"include original audio\" button"].y})`);
+    
     await mouse.move(new Point(guiMap["turn off include \"include original audio\" button"].x, guiMap["turn off include \"include original audio\" button"].y));
+    console.log('   ✅ Mouse moved to audio toggle');
+    await new Promise(r => setTimeout(r, 300));
+    
     await mouse.leftClick();
+    console.log('   ✅ Toggled audio off');
+    console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 12: Click Save Project Button
-    logMessage(settings.logFile, `Step 12: Saving project to ${projectPath}...`);
+    // Step 11: Click Save Project Button
+    console.log('\n💾 Step 11: Clicking Save Project button...');
+    console.log(`   Target coordinates: (${guiMap["Save project button"].x}, ${guiMap["Save project button"].y})`);
+    logMessage(settings.logFile, `Step 11: Saving project as .toproj...`);
+    
     await mouse.move(new Point(guiMap["Save project button"].x, guiMap["Save project button"].y));
+    console.log('   ✅ Mouse moved to Save Project button');
+    await new Promise(r => setTimeout(r, 500));
+    
     await mouse.leftClick();
-    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
+    console.log('   ✅ Clicked Save Project button');
+    
+    // Wait for save dialog to open
+    const saveDialogDelay = settings.delays.fileDialogOpen || 3000;
+    console.log(`   ⏳ Waiting ${saveDialogDelay}ms for save dialog...`);
+    await new Promise(r => setTimeout(r, saveDialogDelay));
 
-    // Step 13: Type FULL project path and save
+    // Step 12: Type project file path (.toproj)
+    console.log('\n📝 Step 12: Entering project file path...');
+    console.log(`   Path: ${projectPath}`);
+    
     // Clear existing text
     await keyboard.pressKey("Control", "A");
     await new Promise(r => setTimeout(r, 100));
@@ -201,29 +263,94 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     
     // Type full path
     await keyboard.type(projectPath);
+    console.log('   ✅ Typed project path');
     await new Promise(r => setTimeout(r, 800));
     
-    // Click save button
-    await mouse.move(new Point(guiMap["save .toproj file button"].x, guiMap["save .toproj file button"].y));
-    await mouse.leftClick();
-    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
-
-    // Step 14: Export final MP4 video
-    logMessage(settings.logFile, `Step 14: Exporting video to ${outputVideo}...`);
+    // Click save button for .toproj
+    console.log('\n💾 Step 12b: Clicking Save button for .toproj...');
+    console.log(`   Target coordinates: (${guiMap["save .toproj file button"].x}, ${guiMap["save .toproj file button"].y})`);
     
-    // Clear and type output video path
+    await mouse.move(new Point(guiMap["save .toproj file button"].x, guiMap["save .toproj file button"].y));
+    console.log('   ✅ Mouse moved to Save button');
+    await new Promise(r => setTimeout(r, 500));
+    
+    await mouse.leftClick();
+    console.log('   ✅ Saved .toproj file');
+    
+    // Wait for .mp4 save dialog to open
+    const mp4DialogDelay = settings.delays.fileDialogOpen || 3000;
+    console.log(`   ⏳ Waiting ${mp4DialogDelay}ms for .mp4 save dialog to open...`);
+    await new Promise(r => setTimeout(r, mp4DialogDelay));
+
+    // Step 13: Click button to set path for .mp4 file
+    console.log('\n📁 Step 13: Clicking path field for .mp4 file...');
+    console.log(`   Target coordinates: (${guiMap["button to set path to save .mp4 file"].x}, ${guiMap["button to set path to save .mp4 file"].y})`);
+    logMessage(settings.logFile, `Step 13: Setting output path for .mp4 file...`);
+    
+    await mouse.move(new Point(guiMap["button to set path to save .mp4 file"].x, guiMap["button to set path to save .mp4 file"].y));
+    console.log('   ✅ Mouse moved to path field');
+    await new Promise(r => setTimeout(r, 500));
+    
+    await mouse.leftClick();
+    console.log('   ✅ Clicked path field');
+    await new Promise(r => setTimeout(r, 800));
+
+    // Step 13b: Type output video path (.mp4)
+    console.log('\n📝 Step 13b: Entering output video path...');
+    console.log(`   Path: ${outputVideo}`);
+    
+    // Clear existing text
     await keyboard.pressKey("Control", "A");
     await new Promise(r => setTimeout(r, 100));
     await keyboard.releaseKey("Control", "A");
     await new Promise(r => setTimeout(r, 100));
     
+    // Type full output path
     await keyboard.type(outputVideo);
+    console.log('   ✅ Typed output video path');
     await new Promise(r => setTimeout(r, 800));
+
+    // Step 13c: Click Save button for .mp4 path
+    console.log('\n💾 Step 13c: Clicking Save button for .mp4 path...');
+    console.log(`   Target coordinates: (${guiMap["save button for saving .mp4 path"].x}, ${guiMap["save button for saving .mp4 path"].y})`);
     
-    // Click final save button
-    await mouse.move(new Point(guiMap[".mp4 file save button"].x, guiMap[".mp4 file save button"].y));
+    await mouse.move(new Point(guiMap["save button for saving .mp4 path"].x, guiMap["save button for saving .mp4 path"].y));
+    console.log('   ✅ Mouse moved to Save button');
+    await new Promise(r => setTimeout(r, 500));
+    
     await mouse.leftClick();
+    console.log('   ✅ Saved .mp4 path');
+    console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
+
+    // Step 13d: Click Export button to save .mp4 video file
+    console.log('\n🎥 Step 13d: Clicking Export button to save .mp4 video...');
+    console.log(`   Target coordinates: (${guiMap["export button to save .mp4 video file "].x}, ${guiMap["export button to save .mp4 video file "].y})`);
+    logMessage(settings.logFile, `Step 13d: Starting MP4 export...`);
+    
+    await mouse.move(new Point(guiMap["export button to save .mp4 video file "].x, guiMap["export button to save .mp4 video file "].y));
+    console.log('   ✅ Mouse moved to Export button');
+    await new Promise(r => setTimeout(r, 500));
+    
+    await mouse.leftClick();
+    console.log('   ✅ Started MP4 export!');
+    console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for export to begin...`);
+    await new Promise(r => setTimeout(r, settings.delays.stepDelay));
+
+    // Step 14: Close Telemetry Overlay window for next video
+    console.log('\n🚪 Step 14: Closing Telemetry Overlay window...');
+    logMessage(settings.logFile, `Step 14: Closing application for next video...`);
+    
+    // Press Alt+F4 to close the window
+    await keyboard.pressKey("Alt", "F4");
+    await new Promise(r => setTimeout(r, 100));
+    await keyboard.releaseKey("Alt", "F4");
+    console.log('   ✅ Sent close command (Alt+F4)');
+    
+    // Wait for window to close
+    console.log('   ⏳ Waiting 2s for window to close...');
+    await new Promise(r => setTimeout(r, 2000));
+    console.log('   ✅ Window closed, ready for next video!');
 
     logMessage(settings.logFile, `✅ Completed ${videoName}`);
   } catch (err) {

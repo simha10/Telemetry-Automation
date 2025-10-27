@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
-const { getAllVideos, moveToProcessed } = require("./fileUtils");
+const { getAllVideos } = require("./fileUtils");
 const { automateTelemetry } = require("./telemetryAutomation");
 
 const settings = require("../config/settings.json");
@@ -43,19 +43,7 @@ function askQuestion(query) {
     outputFolder = outputFolder.replace(/"/g, '');
   }
   
-  // Ask for processed folder
-  console.log('\n📂 Processed Videos Folder Configuration:');
-  const defaultProcessedFolder = path.join(inputFolder, 'Processed');
-  console.log(`   Default: ${defaultProcessedFolder}`);
-  const useDefaultProcessed = await askQuestion('   Use this path? (y/n): ');
-  
-  let processedFolder;
-  if (useDefaultProcessed.toLowerCase() !== 'y') {
-    processedFolder = await askQuestion('   Enter processed folder path: ');
-    processedFolder = processedFolder.replace(/"/g, '');
-  } else {
-    processedFolder = defaultProcessedFolder;
-  }
+
   
   // Ask for pattern file
   console.log('\n📂 Pattern File Configuration:');
@@ -72,14 +60,7 @@ function askQuestion(query) {
   console.log('\n✅ Configuration Summary:');
   console.log(`   Input:     ${inputFolder}`);
   console.log(`   Output:    ${outputFolder}`);
-  console.log(`   Processed: ${processedFolder}`);
   console.log(`   Pattern:   ${patternFile}`);
-  
-  // Create processed folder
-  if (!fs.existsSync(processedFolder)) {
-    fs.mkdirSync(processedFolder, { recursive: true });
-    console.log(`\n📁 Created Processed folder: ${processedFolder}`);
-  }
   
   // Verify folders exist
   if (!fs.existsSync(inputFolder)) {
@@ -123,45 +104,70 @@ function askQuestion(query) {
   let processedCount = 0;
   let failedCount = 0;
   
+  // Load or create processed videos tracking file
+  const processedTrackingFile = path.join(inputFolder, '.processed_videos.json');
+  let processedVideos = [];
+  
+  if (fs.existsSync(processedTrackingFile)) {
+    try {
+      processedVideos = JSON.parse(fs.readFileSync(processedTrackingFile, 'utf8'));
+      console.log(`📝 Loaded tracking file: ${processedVideos.length} videos already processed`);
+    } catch (err) {
+      console.log(`⚠️  Could not read tracking file, starting fresh`);
+      processedVideos = [];
+    }
+  }
+  
   // Process videos one by one
   while (true) {
-    const videos = getAllVideos(inputFolder);
+    const allVideos = getAllVideos(inputFolder);
+    
+    // Filter out already processed videos
+    const videos = allVideos.filter(videoPath => {
+      const videoName = path.basename(videoPath);
+      return !processedVideos.includes(videoName);
+    });
     
     if (videos.length === 0) {
       console.log('\n✅ No more videos to process!');
+      if (allVideos.length > processedVideos.length) {
+        console.log(`   (${allVideos.length - processedVideos.length} videos were already processed)`);
+      }
       break;
     }
     
-    // Always take the FIRST video
+    // Always take the FIRST unprocessed video
     const videoPath = videos[0];
     const videoName = path.basename(videoPath);
     
     console.log(`\n${'='.repeat(60)}`);
     console.log(`📹 Processing: ${videoName}`);
-    console.log(`   (${videos.length} videos remaining)`);
+    console.log(`   (${videos.length} unprocessed videos remaining)`);
     console.log('='.repeat(60));
     
     try {
       // Process the video
       await automateTelemetry(videoPath, patternFile, runtimeSettings, guiMap);
       
-      // Move to Processed folder
-      console.log(`\n📦 Moving ${videoName} to Processed folder...`);
-      moveToProcessed(inputFolder, processedFolder, videoName);
-      console.log(`✅ Moved successfully!`);
+      console.log(`\n✅ Automation completed for ${videoName}`);
+      console.log(`   🎥 Rendering in progress... Output will be saved to: ${outputFolder}`);
+      console.log(`   💾 Original video remains in input folder for rendering`);
+      
+      // Add to processed list
+      processedVideos.push(videoName);
+      fs.writeFileSync(processedTrackingFile, JSON.stringify(processedVideos, null, 2));
+      console.log(`   ✅ Marked as processed in tracking file`);
       
       processedCount++;
       
     } catch (err) {
       console.log(`\n❌ Error processing ${videoName}: ${err.message}`);
-      console.log(`⚠️  Skipping this video...`);
+      console.log(`⚠️  Moving to next video...`);
       
-      // Move failed video to a "Failed" folder
-      const failedFolder = path.join(inputFolder, 'Failed');
-      if (!fs.existsSync(failedFolder)) {
-        fs.mkdirSync(failedFolder, { recursive: true });
-      }
-      moveToProcessed(inputFolder, failedFolder, videoName);
+      // Add to processed list even if failed (to avoid retry loop)
+      processedVideos.push(videoName);
+      fs.writeFileSync(processedTrackingFile, JSON.stringify(processedVideos, null, 2));
+      console.log(`   📝 Marked as failed in tracking file`);
       
       failedCount++;
     }
@@ -174,13 +180,11 @@ function askQuestion(query) {
   console.log('\n🎉 Automation Complete!\n');
   console.log(`   ✅ Successfully processed: ${processedCount} videos`);
   if (failedCount > 0) {
-    console.log(`   ❌ Failed: ${failedCount} videos (check Failed folder)`);
+    console.log(`   ❌ Failed: ${failedCount} videos`);
   }
-  console.log(`\n📁 Results saved to: ${outputFolder}`);
-  console.log(`📁 Processed videos moved to: ${processedFolder}`);
-  if (failedCount > 0) {
-    const failedFolder = path.join(inputFolder, 'Failed');
-    console.log(`📁 Failed videos in: ${failedFolder}`);
-  }
+  console.log(`\n📁 Results will be saved to: ${outputFolder}`);
+  console.log(`📁 Source videos remain in: ${inputFolder}`);
+  console.log(`\n📝 Tracking file: ${processedTrackingFile}`);
+  console.log(`   (Delete this file to reprocess all videos)`);
   console.log('\n' + '='.repeat(60) + '\n');
 })();
