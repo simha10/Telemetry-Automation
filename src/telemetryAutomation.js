@@ -3,6 +3,7 @@ const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { log: logMessage } = require("./logger");
+const { waitForRenderComplete, killTelemetryProcesses } = require("./renderMonitor");
 
 /**
  * Calculates estimated encoding time based on video file size
@@ -337,24 +338,93 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for export to begin...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 14: Close Telemetry Overlay window for next video
-    console.log('\n🚪 Step 14: Closing Telemetry Overlay window...');
-    logMessage(settings.logFile, `Step 14: Closing application for next video...`);
+    // Step 14: Wait for render to complete (NEW - File monitoring with stuck detection)
+    console.log('\n⏱️  Step 14: Waiting for render to complete...');
+    logMessage(settings.logFile, `Step 14: Monitoring render completion for ${videoName}...`);
     
-    // Press Alt+F4 to close the window
+    try {
+      await waitForRenderComplete(outputVideo, {
+        timeout: settings.delays.renderTimeout || 7200000,
+        checkInterval: settings.delays.renderCheckInterval || 60000,
+        stabilityDuration: settings.delays.renderStabilityDuration || 60000,
+        postRenderWait: settings.delays.postRenderMetadataWait || 300000,
+        maxStuckChecks: settings.delays.maxStuckChecks || 10
+      });
+      console.log('   ✅ Render confirmed complete!');
+      logMessage(settings.logFile, `Render completed successfully: ${outputVideo}`);
+    } catch (err) {
+      // Render stuck or timed out
+      console.log(`\n   ⚠️  Render monitoring error: ${err.message}`);
+      logMessage(settings.logFile, `Render error: ${err.message}`);
+      
+      if (err.message.includes('stuck') || err.message.includes('never appeared')) {
+        console.log(`\n   🛑 RECOVERY MODE ACTIVATED`);
+        console.log(`   ℹ️  The render appears stuck or failed to start`);
+        console.log(`\n   🛠️  Attempting to recover...`);
+        
+        // Force kill the application
+        console.log(`   🔴 Force-killing Telemetry Overlay...`);
+        await killTelemetryProcesses();
+        await new Promise(r => setTimeout(r, 2000));
+        
+        // Check if output file exists and has any size
+        if (fs.existsSync(outputVideo)) {
+          const stats = fs.statSync(outputVideo);
+          const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+          
+          console.log(`\n   💾 Output file exists: ${sizeMB} MB`);
+          
+          if (stats.size > 0) {
+            console.log(`   ℹ️  File has data - partial render may be salvageable`);
+            console.log(`   ⚠️  Marking this video as FAILED for manual review`);
+            logMessage(settings.logFile, `Partial render saved (${sizeMB} MB): ${outputVideo}`);
+          } else {
+            console.log(`   ❌ File is 0 bytes - render completely failed`);
+            console.log(`   🗑️  Removing empty file...`);
+            fs.unlinkSync(outputVideo);
+            logMessage(settings.logFile, `Render failed completely, file removed: ${videoName}`);
+          }
+        } else {
+          console.log(`\n   ❌ No output file created - export never started`);
+          logMessage(settings.logFile, `Export failed to start: ${videoName}`);
+        }
+        
+        console.log(`\n   ⏩ Skipping to next video...\n`);
+        throw new Error(`Render stuck or failed for ${videoName}`);
+      } else {
+        // Other errors (timeout, etc)
+        console.log('   ℹ️  Continuing with cleanup...');
+      }
+    }
+
+    // Step 15: Close Telemetry Overlay window (IMPROVED - Process kill)
+    console.log('\n🚪 Step 15: Closing Telemetry Overlay window...');
+    logMessage(settings.logFile, `Step 15: Closing application for next video...`);
+    
+    // Try Alt+F4 first (graceful close)
     await keyboard.pressKey("Alt", "F4");
     await new Promise(r => setTimeout(r, 100));
     await keyboard.releaseKey("Alt", "F4");
     console.log('   ✅ Sent close command (Alt+F4)');
     
-    // Wait for window to close
-    console.log('   ⏳ Waiting 2s for window to close...');
-    await new Promise(r => setTimeout(r, 2000));
-    console.log('   ✅ Window closed, ready for next video!');
+    // Wait for graceful close
+    console.log('   ⏳ Waiting 3s for window to close...');
+    await new Promise(r => setTimeout(r, 3000));
+    
+    // Force kill any remaining processes
+    await killTelemetryProcesses();
+    
+    console.log('   ✅ Application fully closed, ready for next video!');
 
     logMessage(settings.logFile, `✅ Completed ${videoName}`);
   } catch (err) {
     logMessage(settings.logFile, `❌ Failed ${videoName}: ${err.message}`);
+    
+    // Ensure cleanup even on error
+    console.log('\n⚠️  Error occurred, ensuring cleanup...');
+    await killTelemetryProcesses();
+    
+    throw err; // Re-throw to be caught by index.js
   }
 }
 

@@ -106,13 +106,62 @@ node src/index.js
     "appLoad": 8000,           // App startup time
     "fileDialogOpen": 3000,    // File dialog open time
     "stepDelay": 2000,         // General step delay
-    "encodingTimePerMB": 500,  // Encoding calculation
-    "minEncodingTime": 5000,
-    "maxEncodingTime": 120000,
-    "encodingCheckInterval": 2000
+    "encodingTimePerMB": 500,  // Encoding calculation (500ms per MB)
+    "minEncodingTime": 5000,   // Minimum 5 seconds
+    "maxEncodingTime": 120000, // Maximum 2 minutes
+    "encodingCheckInterval": 2000,
+    "renderTimeout": 7200000,  // 120 minutes (2 hours) max render time
+    "renderCheckInterval": 60000,  // Check every 1 minute
+    "renderStabilityDuration": 60000,  // Stable for 1 minute = complete
+    "postRenderMetadataWait": 300000   // Wait 5 minutes for metadata finalization
   }
 }
 ```
+
+### **Encoding Wait Calculation:**
+
+**Formula:** `encodingTime = (fileSize_MB × 500ms)` clamped between 5s and 120s
+
+**Examples:**
+- 100 MB file: 50 seconds
+- 300 MB file: 120 seconds (capped at 2 min)
+- 500 MB file: 120 seconds (capped at 2 min)
+- 1 GB file: 120 seconds (capped at 2 min)
+- 2 GB file: 120 seconds (capped at 2 min)
+
+**Note:** The encoding wait ensures the video is fully loaded and optimized before proceeding to pattern and export steps.
+
+---
+
+### **🎬 Render Monitoring Strategy:**
+
+#### **Why 1-Minute Check Intervals?**
+- Large video files take time to render (can be 30-90+ minutes)
+- Checking every minute reduces CPU overhead
+- Provides clear progress tracking without excessive logging
+- Each check compares size to previous minute's size
+
+#### **Stability Detection:**
+```
+Check #1:  Size = 125 MB    → Still rendering
+Check #2:  Size = 456 MB    → +331 MB, still rendering
+Check #3:  Size = 892 MB    → +436 MB, still rendering
+Check #4:  Size = 1024 MB   → +132 MB, still rendering
+Check #5:  Size = 1024 MB   → No change! Start stability timer
+Check #6:  Size = 1024 MB   → Stable for 1 minute ✅
+```
+
+#### **Post-Render Metadata Finalization:**
+
+After render completes (file size stable for 1 minute), the system waits an additional **5 minutes** for:
+
+- ✅ **Codec metadata writing** - Video container finalizes headers
+- ✅ **Index generation** - Seeking information written
+- ✅ **Audio synchronization data** - Frame-perfect audio mapping
+- ✅ **Thumbnail generation** - Preview frames embedded
+- ✅ **File system flush** - All data written to disk
+
+**This prevents corrupted or incomplete video files!**
 
 ---
 
