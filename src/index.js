@@ -43,24 +43,10 @@ function askQuestion(query) {
     outputFolder = outputFolder.replace(/"/g, '');
   }
   
-
-  
-  // Ask for pattern file
-  console.log('\n📂 Pattern File Configuration:');
-  console.log(`   Current: ${settings.patternFile}`);
-  const useDefaultPattern = await askQuestion('   Use this path? (y/n): ');
-  
-  let patternFile = settings.patternFile;
-  if (useDefaultPattern.toLowerCase() !== 'y') {
-    patternFile = await askQuestion('   Enter pattern file path: ');
-    patternFile = patternFile.replace(/"/g, '');
-  }
-  
   console.log('\n' + '='.repeat(60));
   console.log('\n✅ Configuration Summary:');
   console.log(`   Input:     ${inputFolder}`);
   console.log(`   Output:    ${outputFolder}`);
-  console.log(`   Pattern:   ${patternFile}`);
   
   // Verify folders exist
   if (!fs.existsSync(inputFolder)) {
@@ -73,12 +59,6 @@ function askQuestion(query) {
     console.log(`\n⚠️  Output folder does not exist. Creating...`);
     fs.mkdirSync(outputFolder, { recursive: true });
     console.log(`✅ Created: ${outputFolder}`);
-  }
-  
-  if (!fs.existsSync(patternFile)) {
-    console.log(`\n❌ Pattern file does not exist: ${patternFile}`);
-    rl.close();
-    return;
   }
   
   const proceed = await askQuestion('\n🚀 Start automation? (y/n): ');
@@ -97,8 +77,7 @@ function askQuestion(query) {
   const runtimeSettings = {
     ...settings,
     inputFolder,
-    outputFolder,
-    patternFile
+    outputFolder
   };
   
   let processedCount = 0;
@@ -147,7 +126,7 @@ function askQuestion(query) {
     
     try {
       // Process the video
-      await automateTelemetry(videoPath, patternFile, runtimeSettings, guiMap);
+      await automateTelemetry(videoPath, null, runtimeSettings, guiMap);
       
       console.log(`\n✅ Automation completed for ${videoName}`);
       console.log(`   🎥 Rendering in progress... Output will be saved to: ${outputFolder}`);

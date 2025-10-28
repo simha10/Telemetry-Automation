@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { log: logMessage } = require("./logger");
 const { waitForRenderComplete, killTelemetryProcesses } = require("./renderMonitor");
+const { markVideoAsProcessed } = require("./fileUtils");
 
 /**
  * Calculates estimated encoding time based on video file size
@@ -56,6 +57,70 @@ async function waitForEncoding(estimatedTime, checkInterval = 2000) {
   }
   
   console.log(`\n   ✅ Encoding should be complete!\n`);
+}
+
+/**
+ * Enhanced application closure with new buttons
+ * @param {object} guiMap - GUI coordinates map
+ */
+async function closeTelemetryEnhanced(guiMap) {
+  console.log('\n🚪 Enhanced Telemetry Overlay closure...');
+  
+  // Click the window close button (top-right corner)
+  console.log(`   Clicking Close Button at (${guiMap["Close Button"].x}, ${guiMap["Close Button"].y})...`);
+  await mouse.move(new Point(guiMap["Close Button"].x, guiMap["Close Button"].y));
+  await new Promise(r => setTimeout(r, 500));
+  await mouse.leftClick();
+  console.log('   ✅ Clicked window Close Button');
+  
+  // Wait a moment for any confirmation dialog
+  await new Promise(r => setTimeout(r, 1000));
+  
+  // Click the application close confirmation button
+  console.log(`   Clicking Close App Button at (${guiMap["Close App Button"].x}, ${guiMap["Close App Button"].y})...`);
+  await mouse.move(new Point(guiMap["Close App Button"].x, guiMap["Close App Button"].y));
+  await new Promise(r => setTimeout(r, 500));
+  await mouse.leftClick();
+  console.log('   ✅ Clicked Close App Button');
+  
+  // Wait for graceful close
+  console.log('   ⏳ Waiting 3s for window to close...');
+  await new Promise(r => setTimeout(r, 3000));
+  
+  // Force kill any remaining processes
+  await killTelemetryProcesses();
+}
+
+/**
+ * Delete all files in the Telemetry Overlay cache folder
+ */
+async function clearTelemetryCache() {
+  const cachePath = "C:\\Users\\Admin\\Documents\\telemetry-overlay\\cache";
+  
+  try {
+    if (fs.existsSync(cachePath)) {
+      console.log(`\n🗑️  Clearing Telemetry Overlay cache: ${cachePath}`);
+      
+      const files = fs.readdirSync(cachePath);
+      let deletedCount = 0;
+      
+      for (const file of files) {
+        try {
+          const filePath = path.join(cachePath, file);
+          fs.unlinkSync(filePath);
+          deletedCount++;
+        } catch (err) {
+          console.log(`   ⚠️  Could not delete cache file: ${file}`);
+        }
+      }
+      
+      console.log(`   ✅ Deleted ${deletedCount} cache files`);
+    } else {
+      console.log(`\nℹ️  Cache folder does not exist: ${cachePath}`);
+    }
+  } catch (err) {
+    console.log(`\n⚠️  Error clearing cache: ${err.message}`);
+  }
 }
 
 // Configure mouse for better reliability
@@ -397,24 +462,20 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
       }
     }
 
-    // Step 15: Close Telemetry Overlay window (IMPROVED - Process kill)
-    console.log('\n🚪 Step 15: Closing Telemetry Overlay window...');
-    logMessage(settings.logFile, `Step 15: Closing application for next video...`);
+    // NEW: Enhanced application closure and cache cleanup
+    console.log('\n🧹 Step 15: Enhanced application closure and cache cleanup...');
     
-    // Try Alt+F4 first (graceful close)
-    await keyboard.pressKey("Alt", "F4");
-    await new Promise(r => setTimeout(r, 100));
-    await keyboard.releaseKey("Alt", "F4");
-    console.log('   ✅ Sent close command (Alt+F4)');
+    // Close Telemetry Overlay with new buttons
+    await closeTelemetryEnhanced(guiMap);
     
-    // Wait for graceful close
-    console.log('   ⏳ Waiting 3s for window to close...');
-    await new Promise(r => setTimeout(r, 3000));
+    // Clear cache folder
+    await clearTelemetryCache();
     
-    // Force kill any remaining processes
-    await killTelemetryProcesses();
+    // Mark video as processed by renaming it
+    const originalVideoName = path.basename(videoPath);
+    markVideoAsProcessed(settings.inputFolder, originalVideoName);
     
-    console.log('   ✅ Application fully closed, ready for next video!');
+    console.log('   ✅ Application closed, cache cleared, and video marked as processed!');
 
     logMessage(settings.logFile, `✅ Completed ${videoName}`);
   } catch (err) {
@@ -429,4 +490,3 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
 }
 
 module.exports = { automateTelemetry };
-

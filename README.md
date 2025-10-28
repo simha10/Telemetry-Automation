@@ -22,7 +22,14 @@ This project automates the process of applying telemetry patterns to multiple vi
 
 ---
 
-## 🆕 What's New in v2.0 ✨
+## 🆕 What's New in v2.1 ✨
+
+### **Enhanced Workflow** 🔄
+- Only requires input and output folder paths (no pattern file needed)
+- Processes only videos under 1GB in size
+- Enhanced application closure with dual-button sequence
+- Automatic cache folder cleanup after processing
+- Video renaming to mark processed files
 
 ### **Render Completion Monitoring** 🎬
 The automation now **waits for actual render completion** instead of guessing! It monitors the output file and only moves to the next video when the file size has been stable for 10 seconds.
@@ -45,7 +52,9 @@ This automation tool processes multiple video files through Telemetry Overlay, a
 - ✅ Configures export settings (quality, speed, audio)
 - ✅ Saves project files (.toproj)
 - ✅ Exports final videos (.mp4)
-- ✅ Closes application and moves to next video
+- ✅ Closes application with enhanced dual-button sequence
+- ✅ Clears cache files from Telemetry Overlay folder
+- ✅ Renames processed videos to mark completion
 - ✅ Tracks processed videos to avoid reprocessing
 
 ---
@@ -57,6 +66,7 @@ This automation tool processes multiple video files through Telemetry Overlay, a
 #### **1. Batch Video Processing**
 - Processes all `.mp4` or `.MP4` files in a specified folder
 - Case-insensitive file extension handling
+- Filters videos to only process those under 1GB in size
 - Sequential processing with fresh application instance per video
 
 #### **2. Smart Tracking System**
@@ -65,31 +75,37 @@ This automation tool processes multiple video files through Telemetry Overlay, a
 - Safe for rendering - doesn't move or rename source files
 - Resume capability - can stop and restart without losing progress
 
-#### **3. 🆕 Render Completion Monitoring** ✨
+#### **3. 🆕 Enhanced Workflow** ✨
+- **NEW:** Only requires input and output folder paths
+- **NEW:** Filters videos by size (< 1GB)
+- **NEW:** Enhanced application closure with dual-button sequence
+- **NEW:** Automatic cache folder cleanup
+- **NEW:** Video renaming to mark processed files
+
+#### **4. 🆕 Render Completion Monitoring** ✨
 - **NEW:** Monitors output file until render is actually complete
 - Detects file size stabilization (stable for 10 seconds = complete)
 - Real-time progress updates with file size tracking
 - Timeout protection (configurable, default 10 minutes)
 - **Ensures 100% render completion before next video**
 
-#### **4. 🆕 Enhanced Process Cleanup** ✨
+#### **5. 🆕 Enhanced Process Cleanup** ✨
 - **NEW:** Force-kills all Telemetry Overlay processes
 - Graceful close (Alt+F4) + force kill (taskkill)
 - Prevents CPU/memory buildup from stray processes
 - Guaranteed cleanup even on errors
 
-#### **5. Intelligent Wait Times**
+#### **6. Intelligent Wait Times**
 - **Dynamic encoding wait**: Calculates wait time based on video file size (500ms per MB)
 - **Configurable delays**: All timing parameters adjustable in `settings.json`
 - **Progress indicators**: Real-time progress during encoding wait
 
-#### **6. Interactive Setup**
-- Prompts for input/output folder paths
-- Pattern file path configuration
+#### **7. Interactive Setup**
+- Prompts for input/output folder paths only
 - Default values with override option
 - Path validation before execution
 
-#### **7. Automated GUI Workflow**
+#### **8. Automated GUI Workflow**
 1. Launch Telemetry Overlay
 2. Load video via file path typing
 3. Apply recently used pattern (no manual path entry)
@@ -101,16 +117,18 @@ This automation tool processes multiple video files through Telemetry Overlay, a
 6. Set output path for .mp4 file
 7. Export video
 8. 🆕 **Wait for render completion** (monitors file stability)
-9. 🆕 **Force-kill all processes** (ensures cleanup)
+9. 🆕 **Enhanced application closure** (dual-button sequence)
+10. 🆕 **Clear cache folder** (deletes temporary files)
+11. 🆕 **Rename processed video** (marks completion)
 
-#### **8. Error Handling**
+#### **9. Error Handling**
 - Try-catch blocks for each video
 - Failed videos marked in tracking file
 - Continues to next video on error
 - Detailed error logging
 - 🆕 **Guaranteed cleanup even on errors**
 
-#### **9. Console Logging**
+#### **10. Console Logging**
 - Step-by-step progress updates
 - Coordinate display for each click
 - Visual progress indicators (emojis)
@@ -204,7 +222,9 @@ Contains screen coordinates for all GUI elements:
   "save .toproj file button": { "x": 1088, "y": 489 },
   "button to set path to save .mp4 file": { "x": 1641, "y": 828 },
   "save button for saving .mp4 path": { "x": 1088, "y": 489 },
-  "export button to save .mp4 video file": { "x": 1624, "y": 891 }
+  "export button to save .mp4 video file": { "x": 1624, "y": 891 },
+  "Close Button": { "x": 1895, "y": 7 },
+  "Close App Button": { "x": 1083, "y": 545 }
 }
 ```
 
@@ -235,9 +255,8 @@ node src/index.js
 
 ### **Interactive Prompts:**
 
-1. **Input Folder**: Where your `.mp4` videos are located
+1. **Input Folder**: Where your `.mp4` videos are located (only videos under 1GB will be processed)
 2. **Output Folder**: Where to save processed files
-3. **Pattern File**: Path to your `.toptrn` pattern file (only needed once)
 
 ### **Example Session:**
 
@@ -254,16 +273,11 @@ node src/index.js
    Current: E:\MALL_1-10-2025 output1\output
    Use this path? (y/n): y
 
-📂 Pattern File Configuration:
-   Current: E:\pattern.toptrn
-   Use this path? (y/n): y
-
 ============================================================
 
 ✅ Configuration Summary:
    Input:   E:\MALL_1-10-2025 output1
    Output:  E:\MALL_1-10-2025 output1\output
-   Pattern: E:\pattern.toptrn
 
 🚀 Start automation? (y/n): y
 
@@ -275,6 +289,11 @@ node src/index.js
 📹 Processing: VIDEO_001.MP4
    (20 unprocessed videos remaining)
 ============================================================
+
+// Processing steps...
+// Enhanced closure...
+// Cache cleanup...
+// Video renaming...
 ```
 
 ---
@@ -286,6 +305,7 @@ node src/index.js
 ```
 ┌─────────────────────────────────────────────┐
 │  FOR EACH VIDEO IN INPUT FOLDER:           │
+│  (Only videos under 1GB)                   │
 └─────────────────────────────────────────────┘
           ↓
     ┌─────────────────────┐
@@ -331,7 +351,21 @@ node src/index.js
     └─────────────────────┘
           ↓
     ┌─────────────────────┐
-    │ Step 14: Close App  │ (Alt+F4)
+    │ Step 14: Render     │
+    │  - Monitor file     │
+    │  - Wait completion  │
+    └─────────────────────┘
+          ↓
+    ┌─────────────────────┐
+    │ Step 15: Enhanced   │
+    │  - Dual-button      │
+    │  - Close sequence   │
+    └─────────────────────┘
+          ↓
+    ┌─────────────────────┐
+    │ Step 16: Cleanup    │
+    │  - Clear cache      │
+    │  - Rename video     │
     └─────────────────────┘
           ↓
     ┌─────────────────────┐
@@ -367,9 +401,10 @@ E:\Telemetry Automation\
 
 Input Folder Structure:
 E:\MALL_1-10-2025 output1\
-├── VIDEO_001.MP4              # Source videos
-├── VIDEO_002.MP4
-├── VIDEO_003.MP4
+├── VIDEO_001.MP4              # Source videos (under 1GB)
+├── VIDEO_001.MP4.processed    # Processed videos (renamed)
+├── VIDEO_002.MP4              # Source videos (under 1GB)
+├── VIDEO_002.MP4.processed    # Processed videos (renamed)
 └── .processed_videos.json     # Tracking file
 
 Output Folder Structure:
@@ -427,12 +462,23 @@ E:\MALL_1-10-2025 output1\output\
 - Increase `maxEncodingTime`
 - Check video file sizes
 
+#### **6. Cache Folder Issues**
+**Problem:** Unable to clear cache folder
+
+**Solutions:**
+- Verify cache folder path: `C:\Users\Admin\Documents\telemetry-overlay\cache`
+- Check permissions for cache folder
+- Ensure no processes are locking cache files
+
 ### **Reset Automation:**
 
 ```bash
 # Delete tracking file to reprocess all videos
 cd "E:\MALL_1-10-2025 output1"
 del .processed_videos.json
+
+# Manually rename .processed files back to .mp4 to reprocess
+ren "*.processed" *.mp4
 ```
 
 ---
@@ -638,6 +684,6 @@ For issues or questions:
 
 ---
 
-**Last Updated**: 2025-01-27  
-**Version**: 2.0.0 🆕  
+**Last Updated**: 2025-10-28  
+**Version**: 2.1.0 🆕  
 **Status**: Production Ready ✅

@@ -54,5 +54,13 @@
   "export button to save .mp4 video file ": {
     "x": 1624,
     "y": 891
+  },
+  "Close Button": {
+    "x": 1895,
+    "y": 7
+  },
+  "Close App Button": {
+    "x": 1083,
+    "y": 545
   }
 }
