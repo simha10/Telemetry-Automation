@@ -25,11 +25,13 @@ function getAllVideos(inputFolder) {
 function markVideoAsProcessed(inputFolder, videoName) {
   try {
     const originalPath = path.join(inputFolder, videoName);
-    const processedPath = path.join(inputFolder, `${videoName}.processed`);
+    // Add "processed_" prefix instead of ".processed" suffix
+    const processedName = videoName.startsWith('processed_') ? videoName : `processed_${videoName}`;
+    const processedPath = path.join(inputFolder, processedName);
     
     if (fs.existsSync(originalPath)) {
       fs.renameSync(originalPath, processedPath);
-      console.log(`   ✅ Renamed ${videoName} to ${videoName}.processed`);
+      console.log(`   ✅ Renamed ${videoName} to ${processedName}`);
     }
   } catch (err) {
     console.log(`   ⚠️  Could not rename ${videoName}: ${err.message}`);

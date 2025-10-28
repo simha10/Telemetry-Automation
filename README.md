@@ -29,7 +29,7 @@ This project automates the process of applying telemetry patterns to multiple vi
 - Processes only videos under 1GB in size
 - Enhanced application closure with dual-button sequence
 - Automatic cache folder cleanup after processing
-- Video renaming to mark processed files
+- Video renaming to mark processed files (with "processed_" prefix)
 
 ### **Render Completion Monitoring** 🎬
 The automation now **waits for actual render completion** instead of guessing! It monitors the output file and only moves to the next video when the file size has been stable for 10 seconds.
@@ -54,7 +54,7 @@ This automation tool processes multiple video files through Telemetry Overlay, a
 - ✅ Exports final videos (.mp4)
 - ✅ Closes application with enhanced dual-button sequence
 - ✅ Clears cache files from Telemetry Overlay folder
-- ✅ Renames processed videos to mark completion
+- ✅ Renames processed videos to mark completion (with "processed_" prefix)
 - ✅ Tracks processed videos to avoid reprocessing
 
 ---
@@ -80,7 +80,7 @@ This automation tool processes multiple video files through Telemetry Overlay, a
 - **NEW:** Filters videos by size (< 1GB)
 - **NEW:** Enhanced application closure with dual-button sequence
 - **NEW:** Automatic cache folder cleanup
-- **NEW:** Video renaming to mark processed files
+- **NEW:** Video renaming with "processed_" prefix to mark processed files
 
 #### **4. 🆕 Render Completion Monitoring** ✨
 - **NEW:** Monitors output file until render is actually complete
@@ -119,7 +119,7 @@ This automation tool processes multiple video files through Telemetry Overlay, a
 8. 🆕 **Wait for render completion** (monitors file stability)
 9. 🆕 **Enhanced application closure** (dual-button sequence)
 10. 🆕 **Clear cache folder** (deletes temporary files)
-11. 🆕 **Rename processed video** (marks completion)
+11. 🆕 **Rename processed video** (adds "processed_" prefix)
 
 #### **9. Error Handling**
 - Try-catch blocks for each video
@@ -402,9 +402,9 @@ E:\Telemetry Automation\
 Input Folder Structure:
 E:\MALL_1-10-2025 output1\
 ├── VIDEO_001.MP4              # Source videos (under 1GB)
-├── VIDEO_001.MP4.processed    # Processed videos (renamed)
+├── processed_VIDEO_001.MP4    # Processed videos (prefixed)
 ├── VIDEO_002.MP4              # Source videos (under 1GB)
-├── VIDEO_002.MP4.processed    # Processed videos (renamed)
+├── processed_VIDEO_002.MP4    # Processed videos (prefixed)
 └── .processed_videos.json     # Tracking file
 
 Output Folder Structure:
@@ -477,8 +477,8 @@ E:\MALL_1-10-2025 output1\output\
 cd "E:\MALL_1-10-2025 output1"
 del .processed_videos.json
 
-# Manually rename .processed files back to .mp4 to reprocess
-ren "*.processed" *.mp4
+# Manually rename prefixed files back to original names to reprocess
+ren "processed_*" *.MP4
 ```
 
 ---
