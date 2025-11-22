@@ -2,9 +2,10 @@ const { mouse, keyboard, Point, Button } = require("@nut-tree-fork/nut-js");
 const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const { log: logMessage } = require("./logger");
-const { waitForRenderComplete, killTelemetryProcesses } = require("./renderMonitor");
+const { log } = require("./logger");
+const { waitForRenderComplete, killTelemetryProcesses, getVideoDuration } = require("./renderMonitor");
 const { markVideoAsProcessed } = require("./fileUtils");
+const settingsConfig = require("../config/settings.json");
 
 /**
  * Calculates estimated encoding time based on video file size
@@ -17,6 +18,12 @@ function calculateEncodingTime(videoPath, settings) {
     const stats = fs.statSync(videoPath);
     const fileSizeInMB = stats.size / (1024 * 1024);
     
+    // Show size validation information
+    const fileSizeInGB = fileSizeInMB / 1024;
+    const maxSizeGB = settingsConfig.maxFileSizeGB || 2; // Default to 2GB if not set
+    console.log(`   📊 Video size: ${fileSizeInMB.toFixed(2)} MB (${fileSizeInGB.toFixed(2)} GB)`);
+    console.log(`   ✅ Size validation: ${fileSizeInGB.toFixed(2)} GB < ${maxSizeGB} GB = ${fileSizeInGB < maxSizeGB}`);
+    
     // Get configurable parameters or use defaults
     const timePerMB = settings.delays.encodingTimePerMB || 500;
     const minTime = settings.delays.minEncodingTime || 5000;
@@ -25,7 +32,6 @@ function calculateEncodingTime(videoPath, settings) {
     // Calculate: timePerMB * file size, clamped between min and max
     const estimatedTime = Math.min(Math.max(fileSizeInMB * timePerMB, minTime), maxTime);
     
-    console.log(`   📊 Video size: ${fileSizeInMB.toFixed(2)} MB`);
     console.log(`   ⏱️  Estimated encoding time: ${(estimatedTime / 1000).toFixed(1)}s`);
     
     return estimatedTime;
@@ -95,7 +101,8 @@ async function closeTelemetryEnhanced(guiMap) {
  * Delete all files in the Telemetry Overlay cache folder
  */
 async function clearTelemetryCache() {
-  const cachePath = "C:\\Users\\Admin\\Documents\\telemetry-overlay\\cache";
+  // Updated cache path as per user's requirement
+  const cachePath = "C:\\Users\\HP\\Documents\\telemetry-overlay\\cache";
   
   try {
     if (fs.existsSync(cachePath)) {
@@ -123,6 +130,18 @@ async function clearTelemetryCache() {
   }
 }
 
+/**
+ * Calculate compression percentage between original and processed video
+ * @param {number} originalSize - Size of original video in bytes
+ * @param {number} processedSize - Size of processed video in bytes
+ * @returns {number} Compression percentage
+ */
+function calculateCompressionPercentage(originalSize, processedSize) {
+  if (originalSize <= 0) return 0;
+  const compression = ((originalSize - processedSize) / originalSize) * 100;
+  return Math.max(0, compression); // Ensure non-negative value
+}
+
 // Configure mouse for better reliability
 mouse.config.mouseSpeed = 500; // Slower mouse movement for visibility
 mouse.config.autoDelayMs = 100; // Small delay between actions
@@ -130,16 +149,48 @@ mouse.config.autoDelayMs = 100; // Small delay between actions
 async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
   // Remove file extension (case-insensitive for .mp4 or .MP4)
   const videoName = path.basename(videoPath).replace(/\.mp4$/i, '');
-  const projectPath = path.join(settings.outputFolder, `${videoName}.toproj`);
-  const outputVideo = path.join(settings.outputFolder, `${videoName}.mp4`);
+  // Fix potential double underscore issues in the video name
+  const cleanVideoName = videoName.replace(/__*/g, '_');
+  const projectPath = path.join(settings.outputFolder, `${cleanVideoName}.toproj`);
+  const outputVideo = path.join(settings.outputFolder, `${cleanVideoName}.mp4`);
 
   try {
-    logMessage(settings.logFile, `Starting automation for ${videoName}`);
-    console.log(`\n⏳ Starting automation for: ${videoName}`);
+    log(`Starting automation for ${cleanVideoName}`);
+    console.log(`\n⏳ Starting automation for: ${cleanVideoName}`);
 
-    // Step 1: Launch Telemetry Overlay app
-    console.log('\n🚀 Step 1: Launching Telemetry Overlay...');
-    logMessage(settings.logFile, `Step 1: Launching Telemetry Overlay`);
+    // Step 0: Clear cache BEFORE starting processing (as per user's requirement)
+    console.log('\n🧹 Step 0: Clearing cache before starting processing...');
+    await clearTelemetryCache();
+
+    // Step 1: Check original video duration and size before processing
+    console.log('\n🔍 Step 1: Analyzing original video...');
+    let originalDuration = null;
+    let originalSize = 0;
+    
+    try {
+      const stats = fs.statSync(videoPath);
+      originalSize = stats.size;
+      const sizeInMB = originalSize / (1024 * 1024);
+      const sizeInGB = sizeInMB / 1024;
+      
+      // Show size validation information
+      const maxSizeGB = settingsConfig.maxFileSizeGB || 2; // Default to 2GB if not set
+      console.log(`   📊 Original video size: ${sizeInMB.toFixed(2)} MB (${sizeInGB.toFixed(2)} GB)`);
+      console.log(`   ✅ Size validation: ${sizeInGB.toFixed(2)} GB < ${maxSizeGB} GB = ${sizeInGB < maxSizeGB}`);
+      
+      originalDuration = await getVideoDuration(videoPath);
+      if (originalDuration !== null) {
+        console.log(`   ⏱️  Original video duration: ${Math.floor(originalDuration / 60)}:${Math.floor(originalDuration % 60).toString().padStart(2, '0')}`);
+      } else {
+        console.log(`   ⏱️  Original video duration: Unknown`);
+      }
+    } catch (err) {
+      console.log(`   ⚠️  Could not analyze original video: ${err.message}`);
+    }
+
+    // Step 2: Launch Telemetry Overlay app
+    console.log('\n🚀 Step 2: Launching Telemetry Overlay...');
+    log(`Step 2: Launching Telemetry Overlay`);
     exec(`"${settings.exePath}"`);
     
     // Wait for app to fully load
@@ -147,10 +198,10 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     await new Promise(r => setTimeout(r, settings.delays.appLoad));
     console.log('   ✅ App should be loaded');
 
-    // Step 2: Click Load Video Button
-    console.log('\n📹 Step 2: Clicking Load Video button...');
+    // Step 3: Click Load Video Button
+    console.log('\n📹 Step 3: Clicking Load Video button...');
     console.log(`   Target coordinates: (${guiMap["Load video button"].x}, ${guiMap["Load video button"].y})`);
-    logMessage(settings.logFile, `Step 2: Loading video from ${videoPath}...`);
+    log(`Step 3: Loading video from ${videoPath}...`);
     
     // Move to button
     await mouse.move(new Point(guiMap["Load video button"].x, guiMap["Load video button"].y));
@@ -169,8 +220,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${fileDialogDelay}ms for file dialog to open...`);
     await new Promise(r => setTimeout(r, fileDialogDelay));
 
-    // Step 3: Type FULL video path (absolute path) and click Open
-    console.log('\n📝 Step 3: Entering video path...');
+    // Step 4: Type FULL video path (absolute path) and click Open
+    console.log('\n📝 Step 4: Entering video path...');
     console.log(`   Path: ${videoPath}`);
     
     // Clear any existing text first
@@ -191,9 +242,9 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     await mouse.leftClick();
     console.log('   ✅ Clicked Open button');
     
-    // Step 3.5: Wait for video encoding/optimization based on file size
-    console.log('\n🔄 Step 3.5: Waiting for video encoding...');
-    logMessage(settings.logFile, `Waiting for video encoding/optimization...`);
+    // Step 4.5: Wait for video encoding/optimization based on file size
+    console.log('\n🔄 Step 4.5: Waiting for video encoding...');
+    log(`Waiting for video encoding/optimization...`);
     
     const encodingTime = calculateEncodingTime(videoPath, settings);
     const checkInterval = settings.delays.encodingCheckInterval || 2000;
@@ -203,10 +254,10 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log('   ⏳ Adding 2s buffer for UI to stabilize...');
     await new Promise(r => setTimeout(r, 2000));
 
-    // Step 4: Click Pattern Button
-    console.log('\n🎨 Step 4: Clicking Pattern button...');
+    // Step 5: Click Pattern Button
+    console.log('\n🎨 Step 5: Clicking Pattern button...');
     console.log(`   Target coordinates: (${guiMap["Pattern Button"].x}, ${guiMap["Pattern Button"].y})`);
-    logMessage(settings.logFile, `Step 4: Loading recently used pattern...`);
+    log(`Step 5: Loading recently used pattern...`);
     
     await mouse.move(new Point(guiMap["Pattern Button"].x, guiMap["Pattern Button"].y));
     console.log('   ✅ Mouse moved to Pattern button');
@@ -219,8 +270,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for pattern menu...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 5: Click Recently Used Pattern Button
-    console.log('\n📂 Step 5: Clicking Recently Used Pattern button...');
+    // Step 6: Click Recently Used Pattern Button
+    console.log('\n📂 Step 6: Clicking Recently Used Pattern button...');
     console.log(`   Target coordinates: (${guiMap["Recently used pattern button"].x}, ${guiMap["Recently used pattern button"].y})`);
     
     await mouse.move(new Point(guiMap["Recently used pattern button"].x, guiMap["Recently used pattern button"].y));
@@ -234,8 +285,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for modal to open...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 6: Click Load button in modal
-    console.log('\n✔️ Step 6: Clicking Load button in modal...');
+    // Step 7: Click Load button in modal
+    console.log('\n✔️ Step 7: Clicking Load button in modal...');
     console.log(`   Target coordinates: (${guiMap["Load button in Modal"].x}, ${guiMap["Load button in Modal"].y})`);
     
     await mouse.move(new Point(guiMap["Load button in Modal"].x, guiMap["Load button in Modal"].y));
@@ -247,10 +298,10 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for pattern to load...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 7: Click Export Button
-    console.log('\n📤 Step 7: Clicking Export button...');
+    // Step 8: Click Export Button
+    console.log('\n📤 Step 8: Clicking Export button...');
     console.log(`   Target coordinates: (${guiMap["Export Button"].x}, ${guiMap["Export Button"].y})`);
-    logMessage(settings.logFile, `Step 7: Configuring export settings...`);
+    log(`Step 8: Configuring export settings...`);
     
     await mouse.move(new Point(guiMap["Export Button"].x, guiMap["Export Button"].y));
     console.log('   ✅ Mouse moved to Export button');
@@ -261,8 +312,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for export panel...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 8: Set video quality to 0
-    console.log('\n🎬 Step 8: Setting video quality to 0...');
+    // Step 9: Set video quality to 0
+    console.log('\n🎬 Step 9: Setting video quality to 0...');
     console.log(`   Target coordinates: (${guiMap["set video quality to 0 button"].x}, ${guiMap["set video quality to 0 button"].y})`);
     
     await mouse.move(new Point(guiMap["set video quality to 0 button"].x, guiMap["set video quality to 0 button"].y));
@@ -274,8 +325,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log('   ✅ Set video quality to 0');
     await new Promise(r => setTimeout(r, 300));
 
-    // Step 9: Set render speed to 0
-    console.log('\n⚡ Step 9: Setting render speed to 0...');
+    // Step 10: Set render speed to 0
+    console.log('\n⚡ Step 10: Setting render speed to 0...');
     console.log(`   Target coordinates: (${guiMap["set render speed to zero button"].x}, ${guiMap["set render speed to zero button"].y})`);
     
     await mouse.move(new Point(guiMap["set render speed to zero button"].x, guiMap["set render speed to zero button"].y));
@@ -287,8 +338,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log('   ✅ Set render speed to 0');
     await new Promise(r => setTimeout(r, 300));
 
-    // Step 10: Turn off "include original audio"
-    console.log('\n🔇 Step 10: Turning off "include original audio"...');
+    // Step 11: Turn off "include original audio"
+    console.log('\n🔇 Step 11: Turning off "include original audio"...');
     console.log(`   Target coordinates: (${guiMap["turn off include \"include original audio\" button"].x}, ${guiMap["turn off include \"include original audio\" button"].y})`);
     
     await mouse.move(new Point(guiMap["turn off include \"include original audio\" button"].x, guiMap["turn off include \"include original audio\" button"].y));
@@ -300,10 +351,10 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 11: Click Save Project Button
-    console.log('\n💾 Step 11: Clicking Save Project button...');
+    // Step 12: Click Save Project Button
+    console.log('\n💾 Step 12: Clicking Save Project button...');
     console.log(`   Target coordinates: (${guiMap["Save project button"].x}, ${guiMap["Save project button"].y})`);
-    logMessage(settings.logFile, `Step 11: Saving project as .toproj...`);
+    log(`Step 12: Saving project as .toproj...`);
     
     await mouse.move(new Point(guiMap["Save project button"].x, guiMap["Save project button"].y));
     console.log('   ✅ Mouse moved to Save Project button');
@@ -317,8 +368,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${saveDialogDelay}ms for save dialog...`);
     await new Promise(r => setTimeout(r, saveDialogDelay));
 
-    // Step 12: Type project file path (.toproj)
-    console.log('\n📝 Step 12: Entering project file path...');
+    // Step 13: Type project file path (.toproj)
+    console.log('\n📝 Step 13: Entering project file path...');
     console.log(`   Path: ${projectPath}`);
     
     // Clear existing text
@@ -333,7 +384,7 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     await new Promise(r => setTimeout(r, 800));
     
     // Click save button for .toproj
-    console.log('\n💾 Step 12b: Clicking Save button for .toproj...');
+    console.log('\n💾 Step 13b: Clicking Save button for .toproj...');
     console.log(`   Target coordinates: (${guiMap["save .toproj file button"].x}, ${guiMap["save .toproj file button"].y})`);
     
     await mouse.move(new Point(guiMap["save .toproj file button"].x, guiMap["save .toproj file button"].y));
@@ -348,10 +399,10 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${mp4DialogDelay}ms for .mp4 save dialog to open...`);
     await new Promise(r => setTimeout(r, mp4DialogDelay));
 
-    // Step 13: Click button to set path for .mp4 file
-    console.log('\n📁 Step 13: Clicking path field for .mp4 file...');
+    // Step 14: Click button to set path for .mp4 file
+    console.log('\n📁 Step 14: Clicking path field for .mp4 file...');
     console.log(`   Target coordinates: (${guiMap["button to set path to save .mp4 file"].x}, ${guiMap["button to set path to save .mp4 file"].y})`);
-    logMessage(settings.logFile, `Step 13: Setting output path for .mp4 file...`);
+    log(`Step 14: Setting output path for .mp4 file...`);
     
     await mouse.move(new Point(guiMap["button to set path to save .mp4 file"].x, guiMap["button to set path to save .mp4 file"].y));
     console.log('   ✅ Mouse moved to path field');
@@ -361,8 +412,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log('   ✅ Clicked path field');
     await new Promise(r => setTimeout(r, 800));
 
-    // Step 13b: Type output video path (.mp4)
-    console.log('\n📝 Step 13b: Entering output video path...');
+    // Step 14b: Type output video path (.mp4)
+    console.log('\n📝 Step 14b: Entering output video path...');
     console.log(`   Path: ${outputVideo}`);
     
     // Clear existing text
@@ -376,8 +427,8 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log('   ✅ Typed output video path');
     await new Promise(r => setTimeout(r, 800));
 
-    // Step 13c: Click Save button for .mp4 path
-    console.log('\n💾 Step 13c: Clicking Save button for .mp4 path...');
+    // Step 14c: Click Save button for .mp4 path
+    console.log('\n💾 Step 14c: Clicking Save button for .mp4 path...');
     console.log(`   Target coordinates: (${guiMap["save button for saving .mp4 path"].x}, ${guiMap["save button for saving .mp4 path"].y})`);
     
     await mouse.move(new Point(guiMap["save button for saving .mp4 path"].x, guiMap["save button for saving .mp4 path"].y));
@@ -389,10 +440,10 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 13d: Click Export button to save .mp4 video file
-    console.log('\n🎥 Step 13d: Clicking Export button to save .mp4 video...');
+    // Step 14d: Click Export button to save .mp4 video file
+    console.log('\n🎥 Step 14d: Clicking Export button to save .mp4 video...');
     console.log(`   Target coordinates: (${guiMap["export button to save .mp4 video file "].x}, ${guiMap["export button to save .mp4 video file "].y})`);
-    logMessage(settings.logFile, `Step 13d: Starting MP4 export...`);
+    log(`Step 14d: Starting MP4 export...`);
     
     await mouse.move(new Point(guiMap["export button to save .mp4 video file "].x, guiMap["export button to save .mp4 video file "].y));
     console.log('   ✅ Mouse moved to Export button');
@@ -403,24 +454,32 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     console.log(`   ⏳ Waiting ${settings.delays.stepDelay}ms for export to begin...`);
     await new Promise(r => setTimeout(r, settings.delays.stepDelay));
 
-    // Step 14: Wait for render to complete (NEW - File monitoring with stuck detection)
-    console.log('\n⏱️  Step 14: Waiting for render to complete...');
-    logMessage(settings.logFile, `Step 14: Monitoring render completion for ${videoName}...`);
+    // Step 15: Wait for render to complete (NEW - File monitoring with stuck detection)
+    console.log('\n⏱️  Step 15: Waiting for render to complete...');
+    log(`Step 15: Monitoring render completion for ${cleanVideoName}...`);
+    
+    let renderResult = { success: false, duration: null };
     
     try {
-      await waitForRenderComplete(outputVideo, {
+      renderResult = await waitForRenderComplete(outputVideo, {
         timeout: settings.delays.renderTimeout || 7200000,
         checkInterval: settings.delays.renderCheckInterval || 60000,
         stabilityDuration: settings.delays.renderStabilityDuration || 60000,
-        postRenderWait: settings.delays.postRenderMetadataWait || 300000,
+        postRenderWait: settings.delays.postRenderMetadataWait || 180000,
         maxStuckChecks: settings.delays.maxStuckChecks || 10
       });
-      console.log('   ✅ Render confirmed complete!');
-      logMessage(settings.logFile, `Render completed successfully: ${outputVideo}`);
+      
+      if (renderResult.success) {
+        console.log('   ✅ Render confirmed complete with valid duration!');
+        log(`Render completed successfully: ${outputVideo}`);
+      } else {
+        console.log('   ⚠️  Render completed but duration check failed!');
+        log(`Render completed but verification failed: ${outputVideo}`);
+      }
     } catch (err) {
       // Render stuck or timed out
       console.log(`\n   ⚠️  Render monitoring error: ${err.message}`);
-      logMessage(settings.logFile, `Render error: ${err.message}`);
+      log(`Render error: ${err.message}`);
       
       if (err.message.includes('stuck') || err.message.includes('never appeared')) {
         console.log(`\n   🛑 RECOVERY MODE ACTIVATED`);
@@ -441,29 +500,80 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
           
           if (stats.size > 0) {
             console.log(`   ℹ️  File has data - partial render may be salvageable`);
-            console.log(`   ⚠️  Marking this video as FAILED for manual review`);
-            logMessage(settings.logFile, `Partial render saved (${sizeMB} MB): ${outputVideo}`);
+            console.log(`   ⚠️  Will not mark as processed for manual review`);
+            log(`Partial render saved (${sizeMB} MB): ${outputVideo}`);
           } else {
             console.log(`   ❌ File is 0 bytes - render completely failed`);
             console.log(`   🗑️  Removing empty file...`);
             fs.unlinkSync(outputVideo);
-            logMessage(settings.logFile, `Render failed completely, file removed: ${videoName}`);
+            log(`Render failed completely, file removed: ${cleanVideoName}`);
           }
         } else {
           console.log(`\n   ❌ No output file created - export never started`);
-          logMessage(settings.logFile, `Export failed to start: ${videoName}`);
+          log(`Export failed to start: ${cleanVideoName}`);
         }
-        
-        console.log(`\n   ⏩ Skipping to next video...\n`);
-        throw new Error(`Render stuck or failed for ${videoName}`);
       } else {
         // Other errors (timeout, etc)
         console.log('   ℹ️  Continuing with cleanup...');
       }
     }
 
+    // Step 16: Verify processed video duration matches original
+    console.log('\n🔍 Step 16: Verifying processed video...');
+    let processedDuration = null;
+    let processedSize = 0;
+    let durationMatch = false;
+    let sizeValidationPassed = false;
+    
+    if (fs.existsSync(outputVideo)) {
+      try {
+        const stats = fs.statSync(outputVideo);
+        processedSize = stats.size;
+        const sizeInMB = processedSize / (1024 * 1024);
+        const sizeInGB = sizeInMB / 1024;
+        const maxSizeGB = settingsConfig.maxFileSizeGB || 2; // Default to 2GB if not set
+        
+        console.log(`   📊 Processed video size: ${sizeInMB.toFixed(2)} MB (${sizeInGB.toFixed(2)} GB)`);
+        console.log(`   ✅ Size validation: ${sizeInGB.toFixed(2)} GB < ${maxSizeGB} GB = ${sizeInGB < maxSizeGB}`);
+        
+        // Validate that the processed file is under max size
+        sizeValidationPassed = sizeInGB < maxSizeGB;
+        
+        processedDuration = await getVideoDuration(outputVideo);
+        if (processedDuration !== null) {
+          console.log(`   ⏱️  Processed video duration: ${Math.floor(processedDuration / 60)}:${Math.floor(processedDuration % 60).toString().padStart(2, '0')}`);
+        } else {
+          console.log(`   ⏱️  Processed video duration: Unknown`);
+        }
+        
+        // Check if durations match (allowing for small differences due to processing)
+        if (originalDuration !== null && processedDuration !== null) {
+          const durationDifference = Math.abs(originalDuration - processedDuration);
+          durationMatch = durationDifference < 2; // Allow up to 2 seconds difference
+          
+          if (durationMatch) {
+            console.log(`   ✅ Video durations match! Difference: ${durationDifference.toFixed(1)} seconds`);
+          } else {
+            console.log(`   ❌ Video durations don't match! Difference: ${durationDifference.toFixed(1)} seconds`);
+          }
+        } else {
+          console.log(`   ⚠️  Could not verify duration match due to missing duration data`);
+        }
+        
+        // Show compression percentage
+        if (originalSize > 0 && processedSize > 0) {
+          const compressionPercentage = ((originalSize - processedSize) / originalSize) * 100;
+          console.log(`   📉 Compression: ${compressionPercentage.toFixed(1)}%`);
+        }
+      } catch (err) {
+        console.log(`   ⚠️  Could not analyze processed video: ${err.message}`);
+      }
+    } else {
+      console.log(`   ❌ Processed video file not found: ${outputVideo}`);
+    }
+
     // NEW: Enhanced application closure and cache cleanup
-    console.log('\n🧹 Step 15: Enhanced application closure and cache cleanup...');
+    console.log('\n🧹 Step 17: Enhanced application closure and cache cleanup...');
     
     // Close Telemetry Overlay with new buttons
     await closeTelemetryEnhanced(guiMap);
@@ -471,19 +581,41 @@ async function automateTelemetry(videoPath, patternPath, settings, guiMap) {
     // Clear cache folder
     await clearTelemetryCache();
     
-    // Mark video as processed by renaming it
-    const originalVideoName = path.basename(videoPath);
-    markVideoAsProcessed(settings.inputFolder, originalVideoName);
+    // ONLY mark video as processed if render was successful AND durations match AND size is valid
+    const processingSuccessful = renderResult.success && durationMatch && sizeValidationPassed;
+    if (processingSuccessful) {
+      const originalVideoName = path.basename(videoPath);
+      markVideoAsProcessed(settings.inputFolder, originalVideoName);
+      console.log('   ✅ Video marked as processed!');
+      log(`✅ Successfully completed ${cleanVideoName}`);
+    } else if (renderResult.success && durationMatch) {
+      console.log('   ⚠️  Render successful and duration matched but size validation failed - will retry in next run');
+      log(`⚠️  Render successful and duration matched but size validation failed for ${cleanVideoName}`);
+    } else if (renderResult.success) {
+      console.log('   ⚠️  Render successful but duration mismatch - will retry in next run');
+      log(`⚠️  Render successful but duration mismatch for ${cleanVideoName}`);
+    } else {
+      console.log('   ⚠️  Render failed - will retry in next run');
+      log(`⚠️  Render failed for ${cleanVideoName}`);
+    }
     
-    console.log('   ✅ Application closed, cache cleared, and video marked as processed!');
+    console.log('   ✅ Application closed and cache cleared!');
 
-    logMessage(settings.logFile, `✅ Completed ${videoName}`);
+    // Only log completion if actually successful
+    if (processingSuccessful) {
+      log(`✅ Completed ${cleanVideoName}`);
+    } else {
+      log(`⚠️  Incomplete processing for ${cleanVideoName}`);
+    }
   } catch (err) {
-    logMessage(settings.logFile, `❌ Failed ${videoName}: ${err.message}`);
+    log(`❌ Failed ${cleanVideoName}: ${err.message}`);
     
     // Ensure cleanup even on error
     console.log('\n⚠️  Error occurred, ensuring cleanup...');
     await killTelemetryProcesses();
+    
+    // Clear cache folder even on error
+    await clearTelemetryCache();
     
     throw err; // Re-throw to be caught by index.js
   }

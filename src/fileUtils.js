@@ -1,10 +1,16 @@
 const fs = require("fs");
 const path = require("path");
+const settings = require("../config/settings.json");
 
 function getAllVideos(inputFolder) {
   return fs.readdirSync(inputFolder)
     .filter(file => {
-      // Only include .mp4 files that are under 1GB
+      // Skip files that are already processed (have 'processed_' prefix)
+      if (file.startsWith("processed_")) {
+        return false;
+      }
+      
+      // Only include .mp4 files that are under 2GB
       if (!file.toLowerCase().endsWith(".mp4")) {
         return false;
       }
@@ -12,8 +18,12 @@ function getAllVideos(inputFolder) {
       try {
         const filePath = path.join(inputFolder, file);
         const stats = fs.statSync(filePath);
-        const sizeInGB = stats.size / (1024 * 1024 * 1024);
-        return sizeInGB < 1; // Only include files under 1GB
+        const sizeInGB = stats.size / (1024 * 1024 * 1024); // Convert bytes to GB
+        const sizeInMB = stats.size / (1024 * 1024); // Convert bytes to MB
+        const maxSizeGB = settings.maxFileSizeGB || 2; // Default to 2GB if not set
+        console.log(`   📊 Checking ${file}: ${sizeInMB.toFixed(2)} MB (${sizeInGB.toFixed(2)} GB)`);
+        console.log(`   ✅ Size validation: ${sizeInGB.toFixed(2)} GB < ${maxSizeGB} GB = ${sizeInGB < maxSizeGB}`);
+        return sizeInGB < maxSizeGB; // Only include files under max size
       } catch (err) {
         console.log(`⚠️  Could not determine size for ${file}, skipping`);
         return false;

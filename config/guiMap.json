@@ -1,66 +1,66 @@
 {
   "Load video button": {
-    "x": 954,
-    "y": 548
+    "x": 798,
+    "y": 457
   },
   "Open button": {
-    "x": 1088,
-    "y": 489
+    "x": 629,
+    "y": 462
   },
   "Pattern Button": {
-    "x": 69,
-    "y": 927
+    "x": 66,
+    "y": 788
   },
   "Recently used pattern button": {
-    "x": 233,
-    "y": 957
+    "x": 238,
+    "y": 799
   },
   "Load button in Modal": {
-    "x": 1056,
-    "y": 613
+    "x": 897,
+    "y": 524
   },
   "Export Button": {
-    "x": 671,
-    "y": 43
-  },
-  "set video quality to 0 button": {
-    "x": 1402,
-    "y": 480
-  },
-  "set render speed to zero button": {
-    "x": 1403,
-    "y": 559
-  },
-  "turn off include \"include original audio\" button": {
-    "x": 1402,
-    "y": 711
-  },
-  "Save project button": {
-    "x": 1769,
+    "x": 669,
     "y": 42
   },
+  "set video quality to 0 button": {
+    "x": 1175,
+    "y": 396
+  },
+  "set render speed to zero button": {
+    "x": 1174,
+    "y": 474
+  },
+  "turn off include \"include original audio\" button": {
+    "x": 1180,
+    "y": 625
+  },
+  "Save project button": {
+    "x": 1450,
+    "y": 43
+  },
   "save .toproj file button": {
-    "x": 1088,
-    "y": 489
+    "x": 628,
+    "y": 463
   },
   "button to set path to save .mp4 file": {
-    "x": 1641,
-    "y": 828
+    "x": 1349,
+    "y": 745
   },
   "save button for saving .mp4 path": {
-    "x": 1088,
-    "y": 489
+    "x": 628,
+    "y": 463
   },
   "export button to save .mp4 video file ": {
-    "x": 1624,
-    "y": 891
+    "x": 1358,
+    "y": 804
   },
   "Close Button": {
-    "x": 1895,
-    "y": 7
+    "x": 1578,
+    "y": 8
   },
   "Close App Button": {
-    "x": 1083,
-    "y": 545
+    "x": 920,
+    "y": 453
   }
 }

@@ -17,52 +17,39 @@ function askQuestion(query) {
 }
 
 (async () => {
-  console.log('\n🎯 Telemetry Automation - Interactive Setup\n');
+  console.log('\n🎯 Telemetry Automation - Direct Path Input\n');
   console.log('='.repeat(60));
   
-  // Ask for input folder
+  // Ask for input folder directly
   console.log('\n📂 Input Folder Configuration:');
-  console.log(`   Current: ${settings.inputFolder}`);
-  const useDefaultInput = await askQuestion('   Use this path? (y/n): ');
+  const inputFolder = await askQuestion(`   Enter input folder path (or press Enter for default: ${settings.inputFolder}): `);
+  const finalInputFolder = inputFolder.trim() !== '' ? inputFolder.trim().replace(/"/g, '') : settings.inputFolder;
   
-  let inputFolder = settings.inputFolder;
-  if (useDefaultInput.toLowerCase() !== 'y') {
-    inputFolder = await askQuestion('   Enter input folder path: ');
-    // Remove quotes if user copied path with quotes
-    inputFolder = inputFolder.replace(/"/g, '');
-  }
-  
-  // Ask for output folder
+  // Ask for output folder directly
   console.log('\n📂 Output Folder Configuration:');
-  console.log(`   Current: ${settings.outputFolder}`);
-  const useDefaultOutput = await askQuestion('   Use this path? (y/n): ');
-  
-  let outputFolder = settings.outputFolder;
-  if (useDefaultOutput.toLowerCase() !== 'y') {
-    outputFolder = await askQuestion('   Enter output folder path: ');
-    outputFolder = outputFolder.replace(/"/g, '');
-  }
+  const outputFolder = await askQuestion(`   Enter output folder path (or press Enter for default: ${settings.outputFolder}): `);
+  const finalOutputFolder = outputFolder.trim() !== '' ? outputFolder.trim().replace(/"/g, '') : settings.outputFolder;
   
   console.log('\n' + '='.repeat(60));
   console.log('\n✅ Configuration Summary:');
-  console.log(`   Input:     ${inputFolder}`);
-  console.log(`   Output:    ${outputFolder}`);
+  console.log(`   Input:     ${finalInputFolder}`);
+  console.log(`   Output:    ${finalOutputFolder}`);
   
   // Verify folders exist
-  if (!fs.existsSync(inputFolder)) {
-    console.log(`\n❌ Input folder does not exist: ${inputFolder}`);
+  if (!fs.existsSync(finalInputFolder)) {
+    console.log(`\n❌ Input folder does not exist: ${finalInputFolder}`);
     rl.close();
     return;
   }
   
-  if (!fs.existsSync(outputFolder)) {
+  if (!fs.existsSync(finalOutputFolder)) {
     console.log(`\n⚠️  Output folder does not exist. Creating...`);
-    fs.mkdirSync(outputFolder, { recursive: true });
-    console.log(`✅ Created: ${outputFolder}`);
+    fs.mkdirSync(finalOutputFolder, { recursive: true });
+    console.log(`✅ Created: ${finalOutputFolder}`);
   }
   
   const proceed = await askQuestion('\n🚀 Start automation? (y/n): ');
-  if (proceed.toLowerCase() !== 'y') {
+  if (proceed.toLowerCase() !== 'y' && proceed.toLowerCase() !== 'yes') {
     console.log('\n❌ Automation cancelled.');
     rl.close();
     return;
@@ -76,15 +63,15 @@ function askQuestion(query) {
   // Update settings with user inputs
   const runtimeSettings = {
     ...settings,
-    inputFolder,
-    outputFolder
+    inputFolder: finalInputFolder,
+    outputFolder: finalOutputFolder
   };
   
   let processedCount = 0;
   let failedCount = 0;
   
   // Load or create processed videos tracking file
-  const processedTrackingFile = path.join(inputFolder, '.processed_videos.json');
+  const processedTrackingFile = path.join(finalInputFolder, '.processed_videos.json');
   let processedVideos = [];
   
   if (fs.existsSync(processedTrackingFile)) {
@@ -99,7 +86,7 @@ function askQuestion(query) {
   
   // Process videos one by one
   while (true) {
-    const allVideos = getAllVideos(inputFolder);
+    const allVideos = getAllVideos(finalInputFolder);
     
     // Filter out already processed videos
     const videos = allVideos.filter(videoPath => {
@@ -129,10 +116,10 @@ function askQuestion(query) {
       await automateTelemetry(videoPath, null, runtimeSettings, guiMap);
       
       console.log(`\n✅ Automation completed for ${videoName}`);
-      console.log(`   🎥 Rendering in progress... Output will be saved to: ${outputFolder}`);
+      console.log(`   🎥 Rendering in progress... Output will be saved to: ${finalOutputFolder}`);
       console.log(`   💾 Original video remains in input folder for rendering`);
       
-      // Add to processed list
+      // Add to processed list ONLY for successfully processed videos
       processedVideos.push(videoName);
       fs.writeFileSync(processedTrackingFile, JSON.stringify(processedVideos, null, 2));
       console.log(`   ✅ Marked as processed in tracking file`);
@@ -143,10 +130,8 @@ function askQuestion(query) {
       console.log(`\n❌ Error processing ${videoName}: ${err.message}`);
       console.log(`⚠️  Moving to next video...`);
       
-      // Add to processed list even if failed (to avoid retry loop)
-      processedVideos.push(videoName);
-      fs.writeFileSync(processedTrackingFile, JSON.stringify(processedVideos, null, 2));
-      console.log(`   📝 Marked as failed in tracking file`);
+      // Do NOT add to processed list for failed videos - they can be retried
+      console.log(`   ⚠️  Video failed - will be retried in next run`);
       
       failedCount++;
     }
@@ -161,8 +146,8 @@ function askQuestion(query) {
   if (failedCount > 0) {
     console.log(`   ❌ Failed: ${failedCount} videos`);
   }
-  console.log(`\n📁 Results will be saved to: ${outputFolder}`);
-  console.log(`📁 Source videos remain in: ${inputFolder}`);
+  console.log(`\n📁 Results will be saved to: ${finalOutputFolder}`);
+  console.log(`📁 Source videos remain in: ${finalInputFolder}`);
   console.log(`\n📝 Tracking file: ${processedTrackingFile}`);
   console.log(`   (Delete this file to reprocess all videos)`);
   console.log('\n' + '='.repeat(60) + '\n');

@@ -1,5 +1,44 @@
 const fs = require("fs");
 const path = require("path");
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
+const settings = require("../config/settings.json");
+
+/**
+ * Checks if a video file has a valid duration
+ * @param {string} videoPath - Path to the video file
+ * @returns {Promise<number|null>} - Duration in seconds or null if invalid
+ */
+async function getVideoDuration(videoPath) {
+  try {
+    // Ensure the file exists before trying to check its duration
+    if (!fs.existsSync(videoPath)) {
+      console.log(`   ⚠️  Video file does not exist: ${videoPath}`);
+      return null;
+    }
+    
+    // Use ffprobe to get video information with better error handling
+    const command = `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${videoPath}"`;
+    console.log(`   🛠️  Executing: ${command}`);
+    
+    const { stdout, stderr } = await execPromise(command);
+    const duration = parseFloat(stdout.trim());
+    
+    // If duration is a valid number and greater than 0
+    if (!isNaN(duration) && duration > 0) {
+      console.log(`   ✅ Video duration: ${duration.toFixed(2)} seconds`);
+      return duration;
+    } else {
+      console.log(`   ⚠️  Invalid duration value: ${stdout.trim()}`);
+      return null;
+    }
+  } catch (error) {
+    console.log(`   ⚠️  Could not check video duration: ${error.message}`);
+    console.log(`   🛠️  Stderr: ${error.stderr || 'No stderr'}`);
+    return null;
+  }
+}
 
 /**
  * Waits for a file to appear and its size to stabilize
@@ -10,16 +49,16 @@ const path = require("path");
  * @param {number} options.timeout - Maximum time to wait (default: 120 minutes)
  * @param {number} options.checkInterval - How often to check file size (default: 60000ms / 1 minute)
  * @param {number} options.stabilityDuration - How long size must be stable (default: 60000ms / 1 minute)
- * @param {number} options.postRenderWait - Post-completion metadata wait (default: 300000ms / 5 minutes)
+ * @param {number} options.postRenderWait - Post-completion metadata wait (default: 90000ms / 1.5 minutes)
  * @param {number} options.maxStuckChecks - Max consecutive checks with no change before declaring stuck (default: 10)
- * @returns {Promise<void>}
+ * @returns {Promise<{success: boolean, duration: number|null}>}
  */
 async function waitForRenderComplete(outputPath, options = {}) {
   const {
     timeout = 7200000,           // 120 minutes max wait (2 hours)
     checkInterval = 60000,       // Check every 1 minute
     stabilityDuration = 60000,   // Must be stable for 1 minute
-    postRenderWait = 300000,     // 5 minutes post-completion for metadata
+    postRenderWait = 90000,     // 1.5 minutes post-completion for metadata
     maxStuckChecks = 10          // 10 minutes of no change = stuck
   } = options;
 
@@ -155,6 +194,13 @@ async function waitForRenderComplete(outputPath, options = {}) {
           console.log(`   ⏸️  Check #${checksPerformed} | File stable at ${currentSizeMB} MB`);
         }
         
+        // Additional validation: Check if file size is reasonable for a video
+        if (currentSize > 0 && currentSize < 1024 * 1024) { // Less than 1MB
+          console.log(`   ⚠️  Warning: File size is unusually small for a video (${currentSizeMB} MB)`);
+        } else if (currentSize > settings.maxFileSizeGB * 1024 * 1024 * 1024) { // Greater than max size
+          console.log(`   ⚠️  Warning: File size exceeds ${settings.maxFileSizeGB}GB limit (${currentSizeGB} GB)`);
+        }
+        
         if (consecutiveNoChangeChecks < maxStuckChecks) {
           console.log(`   🔍 No size change detected | Confirming stability: ${remainingStability.toFixed(1)} minute(s) remaining`);
           console.log(`   ℹ️  Consecutive stable checks: ${consecutiveNoChangeChecks}/${maxStuckChecks} (stuck threshold)\n`);
@@ -175,14 +221,38 @@ async function waitForRenderComplete(outputPath, options = {}) {
           }
           console.log(`   ⏱️  Total render time: ${Math.floor(elapsed / 60000)}m ${Math.floor((elapsed % 60000) / 1000)}s`);
           
-          // NOW WAIT 5 MORE MINUTES FOR METADATA FINALIZATION
-          console.log(`\n   🔧 Waiting ${postRenderWait / 60000} minutes for metadata finalization...`);
-          console.log(`   ℹ️  This ensures video has complete internal metadata and codec settings\n`);
+          // Validate final file size
+          if (currentSize > settings.maxFileSizeGB * 1024 * 1024 * 1024) { // Greater than max size
+            console.log(`   ⚠️  Final file size exceeds ${settings.maxFileSizeGB}GB limit (${currentSizeGB} GB)`);
+            console.log(`   ❌ Video processing failed due to oversized output`);
+            resolve({ success: false, duration: null });
+            return;
+          } else if (currentSize > 0 && currentSize < 1024 * 1024) { // Less than 1MB
+            console.log(`   ⚠️  Final file size is unusually small for a video (${currentSizeMB} MB)`);
+            console.log(`   ❌ Video processing likely failed due to small output size`);
+            resolve({ success: false, duration: null });
+            return;
+          }
           
-          setTimeout(() => {
-            console.log(`   ✅ Metadata finalization complete!`);
-            console.log(`   🎉 Video is ready: ${path.basename(outputPath)}\n`);
-            resolve();
+          // NOW WAIT 3 MINUTES FOR METADATA FINALIZATION AND CHECK DURATION
+          console.log(`\n   🔧 Waiting ${postRenderWait / 60000} minutes for metadata finalization and duration check...`);
+          console.log(`   ℹ️  During this time, we'll check if the video has a valid duration\n`);
+          
+          setTimeout(async () => {
+            // Check video duration to confirm successful render
+            console.log(`\n   🔍 Checking video duration during metadata finalization...`);
+            const duration = await getVideoDuration(outputPath);
+            
+            if (duration !== null) {
+              const formattedDuration = formatDuration(duration);
+              console.log(`   ✅ Video duration verified: ${formattedDuration}! Render successful.`);
+              console.log(`   🎉 Video is ready: ${path.basename(outputPath)}\n`);
+              resolve({ success: true, duration: duration });
+            } else {
+              console.log(`   ⚠️  Video duration check failed or video is incomplete.`);
+              console.log(`   ℹ️  Will not mark as processed and continue to next video...\n`);
+              resolve({ success: false, duration: null });
+            }
           }, postRenderWait);
         }
       }
@@ -194,6 +264,25 @@ async function waitForRenderComplete(outputPath, options = {}) {
       reject(new Error('Process interrupted by user'));
     });
   });
+}
+
+/**
+ * Format duration in seconds to HH:MM:SS format
+ * @param {number} seconds - Duration in seconds
+ * @returns {string} Formatted duration
+ */
+function formatDuration(seconds) {
+  if (seconds === null) return 'Unknown';
+  
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  } else {
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
 }
 
 /**
@@ -226,5 +315,7 @@ async function killTelemetryProcesses() {
 
 module.exports = {
   waitForRenderComplete,
-  killTelemetryProcesses
+  killTelemetryProcesses,
+  getVideoDuration,
+  formatDuration
 };

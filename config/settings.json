@@ -5,19 +5,20 @@
   "processedFolder": "E:\\MALL_1-10-2025 output1\\processed",
   "patternFile": "E:\\pattern.toptrn",
   "logFile": "logs/automation.log",
+  "maxFileSizeGB": 3,
   "delays": {
-    "appLoad": 8000,
+    "appLoad": 6000,
     "fileDialogOpen": 3000,
     "stepDelay": 2000,
-    "encodingTimePerMB": 400,
+    "encodingTimePerMB": 150,
     "minEncodingTime": 4000,
-    "maxEncodingTime": 120000,
+    "maxEncodingTime": 240000,
     "encodingCheckInterval": 2000,
     "renderTimeout": 7200000,
     "renderCheckInterval": 60000,
     "renderStabilityDuration": 60000,
-    "postRenderMetadataWait": 180000,
-    "maxStuckChecks": 10
+    "postRenderMetadataWait": 30000,
+    "maxStuckChecks": 5
   },
   "_IMPORTANT_NOTE": "MAXIMIZE Telemetry Overlay (full screen) before running automation - same as during coordinate tracking!"
 }
